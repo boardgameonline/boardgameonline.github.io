@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Настольная игра для стримов</title>
+<style type="text/css">
+html,body,#wrapper{width:100%;height:100%;padding:0;margin:0;}
+body{font-family:arial, helvetica, sans-serif;}
+
+.circle {
+	position: absolute;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 70px;
+	height: 70px;
+	border-radius: 50%;
+	cursor: move;
+	box-shadow: 0px 0px 7px 0px rgba(34, 60, 80, 0.8);
+	border:2px solid black;
+}
+
+.label {
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+	color:white;
+	text-shadow: 1px 1px 0px #000000;
+	font-weight:bold;
+}
+
+.playerPlate {
+	display:inline-block;
+	position: absolute;
+	left: calc(50% - 330px);
+	font-size:18px;
+	top:20px;
+	padding:10px 12px;
+	min-width:180px;
+	border-radius: 15px;
+	cursor: move;
+	color:black;
+	box-shadow: 0px 0px 7px 0px rgba(34, 60, 80, 0.8);
+	border:2px solid black;
+	background-color:#eaeaea;
+}
+
+#container{float:left; width:calc(100% - 330px); height:100%; background-repeat:no-repeat; background-size:contain; background-color:black;}
+#settings{float:left; height:calc(100% - 20px); padding:10px; border-left:1px dashed gray; width:300px; overflow:hidden; font-size:18px;}
+
+input[type=text],input[type=button],input[type=submit],textarea,select,button{padding:5px; margin:10px 2px; border:1px solid #c2c2c2;}
+input[type=text]:focus,textarea:focus,select:focus{border:1px solid #686868;}
+
+#authors{font-size:12px; color:#d8d8d8;}
+#authors a{color:#d8d8d8;}
+</style>
+<script type="text/javascript">
+//let colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'cyan', 'magenta', 'brown'];
+let colors = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6', '#ec87bf', '#00bcd4', '#e91e63', '#795548'];
+let currentIndex = 0;
+let circleSize = 70;
+let curPlayerIndex = -1;
+let players = [];
+
+function createCircle(color, label, counter) {
+	let circle = document.createElement('div');
+	circle.classList.add('circle');
+	circle.style.backgroundColor = color;
+	circle.style.width = circleSize + 'px';
+	circle.style.height = circleSize + 'px';
+	circle.style.fontSize = 15 + 'px';
+
+	let column = counter % 3; // Определение номера колонки (от 0 до 2)
+	let row = Math.floor(counter / 3); // Определение номера строки
+
+	let top = row * circleSize; // Вычисление значения top
+	let left = column * circleSize; // Вычисление значения left
+
+	circle.style.top = top + 'px'; // Присвоение значения top
+	circle.style.left = left + 'px'; // Присвоение значения left
+
+	let labelDiv = document.createElement('div');
+	labelDiv.classList.add('label');
+	labelDiv.innerText = label;
+
+	circle.appendChild(labelDiv);
+	document.getElementById('container').appendChild(circle);
+
+	makeDraggable(circle);
+}
+
+function createCurrentPlayer() {
+	let currentPlayer = document.createElement('div');
+	currentPlayer.classList.add('playerPlate');
+	currentPlayer.innerHTML = 'Игрок: <b>-</b><br>Число на кубике: <b>X</b>';
+
+	document.getElementById('container').appendChild(currentPlayer);
+
+	makeDraggable(currentPlayer);
+}
+
+function makeDraggable(element) {
+	let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+	element.onmousedown = dragMouseDown;
+
+	function dragMouseDown(e) {
+		e = e || window.event;
+		e.preventDefault();
+		pos3 = e.clientX;
+		pos4 = e.clientY;
+		document.onmouseup = closeDragElement;
+		document.onmousemove = elementDrag;
+	}
+
+	function elementDrag(e) {
+		e = e || window.event;
+		e.preventDefault();
+		pos1 = pos3 - e.clientX;
+		pos2 = pos4 - e.clientY;
+		pos3 = e.clientX;
+		pos4 = e.clientY;
+		element.style.top = (element.offsetTop - pos2) + 'px';
+		element.style.left = (element.offsetLeft - pos1) + 'px';
+	}
+
+	function closeDragElement() {
+		document.onmouseup = null;
+		document.onmousemove = null;
+	}
+}
+
+function changeBackground() {
+	if (document.getElementById('bgurl').value.trim() == '') document.getElementById('bgurl').value = 'https://i.imgur.com/nGMQ7Pk.png';
+	document.getElementById('container').style.backgroundImage = document.getElementById('bgurl').value;
+	document.getElementById('container').style.backgroundImage = "url('" + document.getElementById('bgurl').value + "')";
+}
+
+function clearPlayers(){
+	curPlayerIndex = -1;
+	document.getElementById('container').innerHTML = '';
+	document.getElementById('players').value = '';
+	localStorage.setItem('players', '');
+}
+
+function createPlayers(){
+	// SaveSettings
+	if (document.getElementById('bgurl').value.trim() == '') document.getElementById('bgurl').value = 'https://i.imgur.com/nGMQ7Pk.png';
+	localStorage.setItem('bg', document.getElementById('bgurl').value);
+	localStorage.setItem('players', document.getElementById('players').value);
+
+	players = [];
+	let inputText = document.getElementById('players').value;
+	let lines = inputText.split('\n');
+
+	let circles = document.getElementsByClassName('circle');
+	
+	// Создание и добавление
+	for (let i = 0; i < lines.length; i++) {
+		if (lines[i].trim() == '') continue;
+		players.push(lines[i]);
+		let Found = false;
+		for (let j = 0; j < circles.length; j++)
+			if (lines[i] == circles[j].childNodes[0].innerText) {
+				Found = true;
+				break;
+			}
+		if (Found == false) {
+			let color = colors[currentIndex % colors.length];
+			currentIndex++;
+			createCircle(color, lines[i], i);
+		}
+	}
+	
+	// Удаление
+	for (let i = circles.length - 1; i >= 0; i--) {
+		let Found = false;
+		for (let j = 0; j < lines.length; j++)
+			if (lines[j] == document.getElementsByClassName('circle')[i].childNodes[0].innerText) {
+				Found = true;
+				break;
+			}
+		if (Found == false)
+			document.getElementsByClassName('circle')[i].remove();
+	}
+	
+	
+	let currentPlayers = document.getElementsByClassName('playerPlate');
+	if (currentPlayers.length > 0)
+		document.getElementsByClassName('playerPlate')[0].remove();
+	if (document.getElementById('playerPlate').checked)
+		createCurrentPlayer();
+}
+
+function changeSize(n) {
+	circleSize = parseInt(n);
+	document.getElementById('circleSize').innerHTML = circleSize;
+	let circles = document.getElementsByClassName('circle');
+	for (let i = 0; i < circles.length; i++) {
+		circles[i].style.width = circleSize + 'px';
+		circles[i].style.height = circleSize + 'px';		
+		circles[i].style.fontSize = 6 + Math.round((circleSize) / 10 * 1.3) + 'px';
+		//console.log(Math.round((circleSize) / 10));
+	}
+}
+
+function randNum() {
+	if (curPlayerIndex > players.length - 2)
+		curPlayerIndex = 0;
+	else
+		curPlayerIndex++;
+
+	function getRandomInt(min, max) {
+		min = Math.ceil(min);
+		max = Math.floor(max);
+		return Math.floor(Math.random() * (max - min + 1)) + min;
+	}
+	document.getElementById('curPlayer').innerHTML = players[curPlayerIndex];
+	document.getElementById('randNum').innerHTML = getRandomInt(1, 6);
+	
+	let currentPlayers = document.getElementsByClassName('playerPlate');
+	if (currentPlayers.length > 0)
+		document.getElementsByClassName('playerPlate')[0].innerHTML = 'Игрок: <b>' + document.getElementById('curPlayer').innerHTML + '</b><br>' +
+																		'Число на кубике: <b>' + document.getElementById('randNum').innerHTML + '</b>';
+}
+
+function prevPlayer() {
+	if (curPlayerIndex < 1)
+		curPlayerIndex = players.length - 1;
+	else
+		curPlayerIndex--;
+	//console.log(curPlayerIndex);
+	document.getElementById('curPlayer').innerHTML = players[curPlayerIndex];
+	if (curPlayerIndex < 1)
+		curPlayerIndex = players.length - 1;
+	else
+		curPlayerIndex--;
+	document.getElementById('randNum').innerHTML = 'X';
+}
+
+function convertStringToNumbers(str) {
+   let numbers = [];
+   for (let i = 0; i < str.length; i++)
+      numbers.push(str.charCodeAt(i));
+   return numbers;
+}
+
+function convertNumbersToString(numbers) {
+   let str = '';
+   for (let i = 0; i < numbers.length; i++)
+      str += String.fromCharCode(numbers[i]);
+   return str;
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+	document.getElementById('circleRange').value = 70;
+	if (localStorage.getItem('bg') != null)
+		document.getElementById('bgurl').value = localStorage.getItem('bg');	
+	changeBackground();
+	if (localStorage.getItem('players') != null)
+		document.getElementById('players').value = localStorage.getItem('players');
+	document.getElementById('authors').innerHTML += '<a target="_blank" href="https://t.me/' + convertNumbersToString([97, 49, 97, 110, 119, 97, 107, 101]) + '">' + convertNumbersToString([97, 49, 97, 110, 119, 97, 107, 101]) + '</a>';
+});
+  </script>
+</head>
+<body>
+<div id="wrapper">
+	<div id="container"></div>
+	<div id="settings">
+		Параметры:<br>
+		<input type="text" id="bgurl" placeholder="Ссылка на фон" value="https://i.imgur.com/nGMQ7Pk.png" /> <button onclick="changeBackground()">Изменить</button><br>
+		<span style="font-size:13px; color:gray;">(фоны можно взять <a href="https://www.google.ru/search?q=%D0%BD%D0%B0%D1%81%D1%82%D0%BE%D0%BB%D1%8C%D0%BD%D0%B0%D1%8F+%D0%B8%D0%B3%D1%80%D0%B0+%D0%B1%D1%80%D0%BE%D0%B4%D0%B8%D0%BB%D0%BA%D0%B0&newwindow=1&tbm=isch" target="_blank">тут</a>)</span><br>
+		<br>
+		Игроки:<br>
+		<textarea id="players" rows="5" cols="30"></textarea><br>
+		<button onclick="clearPlayers()">Очистить</button>
+		<button onclick="createPlayers()">Создать / Обновить</button>
+		<br><br>
+		Размер: <span id="circleSize">70</span><br>
+		<input type="range" min="30" max="150" value="70" id="circleRange" oninput="changeSize(this.value)" />
+		<br><br>
+		<input type="checkbox" id="playerPlate" checked /><label for="playerPlate"> Табличка игрока</label>
+		<br><br>
+		<div style="height:1px; border-top:1px dashed gray; margin:10px auto; width:98%;"></div>
+		Игрок: <span style="font-weight:bold" id="curPlayer">-</span><br>
+		Число на кубике: <span style="font-weight:bold" id="randNum">X</span><br>
+		<button onclick="randNum()">Подкинуть</button>
+		<button onclick="prevPlayer()">Вернуть прошлого игрока</button><br><br>
+		<div id="authors">Создатели: ChatGPT 3.5 и </div>
+	</div>
+</div>
+</body>
+</html>
